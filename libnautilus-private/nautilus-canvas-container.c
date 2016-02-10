@@ -98,7 +98,7 @@
  * where a 76px canvas item would only take one.
  * Canvas items are then centered in the extra available space.
  */
-#define STANDARD_ICON_GRID_WIDTH 80
+#define STANDARD_ICON_GRID_WIDTH 145
 
 /* Desktop layout mode defines */
 #define DESKTOP_PAD_HORIZONTAL 	10
@@ -355,6 +355,8 @@ nautilus_canvas_container_get_icon_size_for_zoom_level (NautilusCanvasZoomLevel 
 		return NAUTILUS_CANVAS_ICON_SIZE_STANDARD;
 	case NAUTILUS_CANVAS_ZOOM_LEVEL_LARGE:
 		return NAUTILUS_CANVAS_ICON_SIZE_LARGE;
+	case NAUTILUS_CANVAS_ZOOM_LEVEL_LARGER:
+		return NAUTILUS_CANVAS_ICON_SIZE_LARGER;
 	}
 	g_return_val_if_reached (NAUTILUS_CANVAS_ICON_SIZE_STANDARD);
 }
@@ -6255,8 +6257,8 @@ nautilus_canvas_container_set_zoom_level (NautilusCanvasContainer *container, in
 	pinned_level = new_level;
 	if (pinned_level < NAUTILUS_CANVAS_ZOOM_LEVEL_SMALL) {
 		pinned_level = NAUTILUS_CANVAS_ZOOM_LEVEL_SMALL;
-	} else if (pinned_level > NAUTILUS_CANVAS_ZOOM_LEVEL_LARGE) {
-		pinned_level = NAUTILUS_CANVAS_ZOOM_LEVEL_LARGE;
+	} else if (pinned_level > NAUTILUS_CANVAS_ZOOM_LEVEL_LARGER) {
+		pinned_level = NAUTILUS_CANVAS_ZOOM_LEVEL_LARGER;
 	}
 
         if (pinned_level == details->zoom_level) {
