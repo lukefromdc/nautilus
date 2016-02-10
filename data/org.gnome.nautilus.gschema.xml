@@ -36,12 +36,14 @@
     <value value="0" nick="small"/>
     <value value="1" nick="standard"/>
     <value value="2" nick="large"/>
+    <value value="3" nick="larger"/>
   </enum>
 
   <enum id="org.gnome.nautilus.ListZoomLevel">
     <value value="0" nick="small"/>
     <value value="1" nick="standard"/>
     <value value="2" nick="large"/>
+    <value value="3" nick="larger"/>
   </enum>
 
   <enum id="org.gnome.nautilus.TabPosition">
