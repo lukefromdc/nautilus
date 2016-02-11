@@ -78,15 +78,10 @@
       <summary>Always use the location entry, instead of the pathbar</summary>
       <description>If set to true, then Nautilus browser windows will always use a textual input entry for the location toolbar, instead of the pathbar.</description>
     </key>
-    <key type="b" name="local-recursive-search">
-      <default>true</default>
-      <summary>Whether to enable local recursive search or not</summary>
-      <description>Enables or disables local recursive search in Nautilus.</description>
-    </key>
-    <key type="b" name="remote-recursive-search">
-      <default>false</default>
-      <summary>Whether to enable recursive search or not on remote locations</summary>
-      <description>Enables or disables recursive search on remote locations in Nautilus.</description>
+    <key name="recursive-search" enum="org.gnome.nautilus.SpeedTradeoff">
+      <default>'local-only'</default>
+      <summary>Where to perform recursive search</summary>
+      <description>In which locations Nautilus should search on subfolders. Available values are 'local-only', 'always', 'never'.</description>
     </key>
     <key name="search-filter-time-type" enum="org.gnome.nautilus.SearchFilterTimeType">
       <default>'last_modified'</default>
@@ -150,10 +145,9 @@
       <description>For users with mice that have buttons for "Forward" and "Back", this key will set which button activates the "Back" command in a browser window. Possible values range between 6 and 14.</description>
     </key>
     <key name="show-image-thumbnails" enum="org.gnome.nautilus.SpeedTradeoff">
-      <aliases><alias value='local_only' target='local-only'/></aliases>
       <default>'local-only'</default>
       <summary>When to show thumbnails of files</summary>
-      <description>Speed trade-off for when to show a file as a thumbnail. If set to "always" then always thumbnail, even if the folder is on a remote server. If set to "local-only" then only show thumbnails for local file systems. If set to "never" then never bother to thumbnail files, just use a generic icon. Despite what the name may suggest, this applies to any previewable file type.</description>
+      <description>Speed trade-off for when to show a file as a thumbnail. If set to "all" then always thumbnail, even if the folder is on a remote server. If set to "local" then only show thumbnails for local file systems. If set to "never" then never bother to thumbnail files, just use a generic icon. Despite what the name may suggest, this applies to any previewable file type.</description>
     </key>
     <key type="t" name="thumbnail-limit">
       <default>10485760</default>

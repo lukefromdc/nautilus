@@ -67,7 +67,7 @@
 #define NAUTILUS_PREFERENCES_DIALOG_THUMBNAIL_LIMIT_WIDGET                     \
   "preview_image_size_combobox"
 
-static const char *const preview_values[] = {"always", "local-only", "never",
+static const char *const speed_tradeoff_values[] = {"always", "local-only", "never",
                                              NULL};
 
 static const char *const click_behavior_components[] = {
@@ -81,6 +81,15 @@ static const char *const executable_text_components[] = {
 
 static const char *const executable_text_values[] = {"launch", "display", "ask",
                                                      NULL};
+
+static const char *const recursive_search_components[] = {
+    "search_recursive_only_this_computer_radiobutton", "search_recursive_all_locations_radiobutton", "search_recursive_never_radiobutton", NULL};
+
+static const char *const thumbnails_components[] = {
+    "thumbnails_only_this_computer_radiobutton", "thumbnails_all_files_radiobutton", "thumbnails_never_radiobutton", NULL};
+
+static const char *const count_components[] = {
+    "count_only_this_computer_radiobutton", "count_all_files_radiobutton", "count_never_radiobutton", NULL};
 
 static const guint64 thumbnail_limit_values[] = {
     102400,   512000,    1048576,    3145728,     5242880,
@@ -468,10 +477,6 @@ static void nautilus_preferences_dialog_setup(GtkBuilder *builder,
                                               GtkWindow *window) {
   GtkWidget *dialog;
 
-  /* setup UI */
-  nautilus_preferences_dialog_size_group_create(builder, "captions_label", 3);
-  nautilus_preferences_dialog_size_group_create(builder, "preview_label", 3);
-
   /* setup preferences */
   bind_builder_bool(builder, nautilus_preferences,
                     NAUTILUS_PREFERENCES_DIALOG_FOLDERS_FIRST_WIDGET,
@@ -493,21 +498,6 @@ static void nautilus_preferences_dialog_setup(GtkBuilder *builder,
   bind_builder_bool(builder, nautilus_preferences,
                     NAUTILUS_PREFERENCES_DIALOG_DELETE_PERMANENTLY_WIDGET,
                     NAUTILUS_PREFERENCES_SHOW_DELETE_PERMANENTLY);
-  bind_builder_bool(builder, nautilus_preferences,
-                    NAUTILUS_PREFERENCES_DIALOG_LOCAL_RECURSIVE_SEARCH_WIDGET,
-                    NAUTILUS_PREFERENCES_LOCAL_RECURSIVE_SEARCH);
-  bind_builder_bool(builder, nautilus_preferences,
-                    NAUTILUS_PREFERENCES_DIALOG_REMOTE_RECURSIVE_SEARCH_WIDGET,
-                    NAUTILUS_PREFERENCES_REMOTE_RECURSIVE_SEARCH);
-
-  bind_builder_enum(builder, nautilus_preferences,
-                    NAUTILUS_PREFERENCES_DIALOG_PREVIEW_FILES_WIDGET,
-                    NAUTILUS_PREFERENCES_SHOW_FILE_THUMBNAILS,
-                    (const char **)preview_values);
-  bind_builder_enum(builder, nautilus_preferences,
-                    NAUTILUS_PREFERENCES_DIALOG_PREVIEW_FOLDER_WIDGET,
-                    NAUTILUS_PREFERENCES_SHOW_DIRECTORY_ITEM_COUNTS,
-                    (const char **)preview_values);
 
   bind_builder_radio(
       builder, nautilus_preferences, (const char **)click_behavior_components,
@@ -516,6 +506,18 @@ static void nautilus_preferences_dialog_setup(GtkBuilder *builder,
                      (const char **)executable_text_components,
                      NAUTILUS_PREFERENCES_EXECUTABLE_TEXT_ACTIVATION,
                      (const char **)executable_text_values);
+  bind_builder_radio(builder, nautilus_preferences,
+                     (const char **)recursive_search_components,
+                     NAUTILUS_PREFERENCES_RECURSIVE_SEARCH,
+                     (const char **)speed_tradeoff_values);
+  bind_builder_radio(builder, nautilus_preferences,
+                     (const char **)thumbnails_components,
+                     NAUTILUS_PREFERENCES_SHOW_FILE_THUMBNAILS,
+                     (const char **)speed_tradeoff_values);
+  bind_builder_radio(builder, nautilus_preferences,
+                     (const char **)count_components,
+                     NAUTILUS_PREFERENCES_SHOW_DIRECTORY_ITEM_COUNTS,
+                     (const char **)speed_tradeoff_values);
 
   bind_builder_uint_enum(builder, nautilus_preferences,
                          NAUTILUS_PREFERENCES_DIALOG_THUMBNAIL_LIMIT_WIDGET,
