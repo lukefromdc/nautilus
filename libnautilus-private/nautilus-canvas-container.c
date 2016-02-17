@@ -98,7 +98,7 @@
  * where a 76px canvas item would only take one.
  * Canvas items are then centered in the extra available space.
  */
-#define STANDARD_ICON_GRID_WIDTH 142
+#define STANDARD_ICON_GRID_WIDTH 54
 
 /* Desktop layout mode defines */
 #define DESKTOP_PAD_HORIZONTAL 	10
