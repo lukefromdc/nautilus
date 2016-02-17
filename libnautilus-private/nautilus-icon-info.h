@@ -40,7 +40,7 @@ typedef enum {
 
 #define NAUTILUS_CANVAS_ICON_SIZE_SMALL		48
 #define NAUTILUS_CANVAS_ICON_SIZE_STANDARD	64
-#define NAUTILUS_CANVAS_ICON_SIZE_LARGE		94
+#define NAUTILUS_CANVAS_ICON_SIZE_LARGE		96
 #define NAUTILUS_CANVAS_ICON_SIZE_LARGER	128
 
 /* Maximum size of an icon that the icon factory will ever produce */
