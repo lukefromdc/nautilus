@@ -1,7 +1,7 @@
 .nautilus-window,
 .nautilus-window notebook,
 .nautilus-window notebook > stack {
-    background: white;
+    background: @theme_base_color;
 }
 
 .nautilus-canvas-item {
@@ -63,7 +63,7 @@
 
 /* Floating status bar */
 .floating-bar {
-  padding: 2px;
+  padding: 1px;
   background-color: @theme_base_color;
   border-width: 1px;
   border-style: solid solid none;
@@ -86,7 +86,7 @@
 }
 
 .floating-bar button {
-    padding: 4px;
+  padding: 0px;
 }
 
 .search-bar {
@@ -159,3 +159,8 @@
 .documents-entry-tag.button:hover {
     color: shade(@entry_tag_bg, 2.10);
 }
+
+/* Workaround for the double border of the searchbar since we use a revealer which
+ * always allocates at least 1 pixel */
+searchbar { border-top: 1px solid @borders; }
+.searchbar-container { margin-top: -1px; }

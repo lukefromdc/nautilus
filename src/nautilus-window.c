@@ -481,9 +481,9 @@ on_location_changed (NautilusWindow *window)
 }
 
 static void
-on_slot_loading_changed (NautilusWindowSlot *slot,
-                         GParamSpec         *pspec,
-                         NautilusWindow     *window)
+on_slot_location_changed (NautilusWindowSlot *slot,
+                          GParamSpec         *pspec,
+                          NautilusWindow     *window)
 {
         if (nautilus_window_get_active_slot (window) == slot)
                 on_location_changed (window);
@@ -513,8 +513,8 @@ static void
 connect_slot (NautilusWindow     *window,
               NautilusWindowSlot *slot)
 {
-        g_signal_connect (slot, "notify::loading",
-                          G_CALLBACK (on_slot_loading_changed), window);
+        g_signal_connect (slot, "notify::location",
+                          G_CALLBACK (on_slot_location_changed), window);
 }
 
 static void
@@ -795,7 +795,10 @@ nautilus_window_sync_allow_stop (NautilusWindow *window,
 			update_cursor (window);
 		}
 
-		nautilus_notebook_sync_loading (NAUTILUS_NOTEBOOK (window->priv->notebook), slot);
+                /* Avoid updating the notebook if we are calling on dispose or
+                 * on removal of a notebook tab */
+                if (nautilus_notebook_contains_slot (NAUTILUS_NOTEBOOK (window->priv->notebook), slot))
+                        nautilus_notebook_sync_loading (NAUTILUS_NOTEBOOK (window->priv->notebook), slot);
 	}
 }
 
@@ -936,12 +939,12 @@ static void
 notify_unmount_done (GMountOperation *op,
                      const gchar     *message)
 {
-  GApplication *application;
+  NautilusApplication *application;
   gchar *notification_id;
 
-  application = g_application_get_default ();
+  application = nautilus_application_get_default ();
   notification_id = g_strdup_printf ("nautilus-mount-operation-%p", op);
-  g_application_withdraw_notification (application, notification_id);
+  nautilus_application_withdraw_notification (application, notification_id);
 
   if (message != NULL)
     {
@@ -955,7 +958,7 @@ notify_unmount_done (GMountOperation *op,
       g_notification_set_body (unplug, strings[1]);
       g_notification_set_icon (unplug, icon);
 
-      g_application_send_notification (application, notification_id, unplug);
+      nautilus_application_send_notification (application, notification_id, unplug);
       g_object_unref (unplug);
       g_object_unref (icon);
       g_strfreev (strings);
@@ -968,13 +971,13 @@ static void
 notify_unmount_show (GMountOperation *op,
                      const gchar     *message)
 {
-  GApplication *application;
+  NautilusApplication *application;
   GNotification *unmount;
   gchar *notification_id;
   GIcon *icon;
   gchar **strings;
 
-  application = g_application_get_default ();
+  application = nautilus_application_get_default ();
   strings = g_strsplit (message, "\n", 0);
   icon = g_themed_icon_new ("media-removable");
 
@@ -984,7 +987,7 @@ notify_unmount_show (GMountOperation *op,
   g_notification_set_priority (unmount, G_NOTIFICATION_PRIORITY_URGENT);
 
   notification_id = g_strdup_printf ("nautilus-mount-operation-%p", op);
-  g_application_send_notification (application, notification_id, unmount);
+  nautilus_application_send_notification (application, notification_id, unmount);
   g_object_unref (unmount);
   g_object_unref (icon);
   g_strfreev (strings);
@@ -1034,13 +1037,14 @@ places_sidebar_show_error_message_cb (GtkPlacesSidebar *sidebar,
 }
 
 static void
-places_sidebar_show_other_locations (NautilusWindow   *window)
+places_sidebar_show_other_locations_with_flags (NautilusWindow     *window,
+                                                GtkPlacesOpenFlags  open_flags)
 {
         GFile *location;
 
         location = g_file_new_for_uri ("other-locations:///");
 
-        open_location_cb (window, location, GTK_PLACES_OPEN_NORMAL);
+        open_location_cb (window, location, open_flags);
 
         g_object_unref (location);
 }
@@ -1578,12 +1582,12 @@ nautilus_window_notification_delete_get_label (NautilusFileUndoInfo *undo_info,
 	if (length == 1) {
 		file_label = g_file_get_basename (files->data);
 	        /* Translators: only one item has been deleted and %s is its name. */
-		label = g_strdup_printf (_("“%s” deleted"), file_label);
+		label = g_markup_printf_escaped (_("“%s” deleted"), file_label);
         	g_free (file_label);
 	} else {
 	        /* Translators: one or more items might have been deleted, and %d
 	         * is the count. */
-		label = g_strdup_printf (ngettext ("%d file deleted", "%d files deleted", length), length);
+		label = g_markup_printf_escaped (ngettext ("%d file deleted", "%d files deleted", length), length);
 	}
 
 	return label;
@@ -1620,7 +1624,9 @@ nautilus_window_on_undo_changed (NautilusFileUndoManager *manager,
 			g_free (label);
 		}
 		g_list_free (files);
-	}
+        } else {
+                hide_notification_delete (window);
+        }
 }
 
 static void
@@ -2590,7 +2596,7 @@ nautilus_window_class_init (NautilusWindowClass *class)
 	gtk_widget_class_bind_template_child_private (wclass, NautilusWindow, notification_operation_open);
 	gtk_widget_class_bind_template_child_private (wclass, NautilusWindow, notification_operation_close);
 
-        gtk_widget_class_bind_template_callback (wclass, places_sidebar_show_other_locations);
+        gtk_widget_class_bind_template_callback (wclass, places_sidebar_show_other_locations_with_flags);
 
 	properties[PROP_DISABLE_CHROME] =
 		g_param_spec_boolean ("disable-chrome",
@@ -2732,4 +2738,17 @@ nautilus_window_show_about_dialog (NautilusWindow *window)
 			      "translator-credits", _("translator-credits"),
 			      "logo-icon-name", "system-file-manager",
 			      NULL);
+}
+
+void
+nautilus_window_search (NautilusWindow *window,
+                        const gchar    *text)
+{
+        NautilusWindowSlot *active_slot;
+
+        active_slot = nautilus_window_get_active_slot (window);
+        if (active_slot)
+                nautilus_window_slot_search (active_slot, text);
+        else
+                g_warning ("Trying search on a slot but no active slot present");
 }

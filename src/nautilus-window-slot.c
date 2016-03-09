@@ -110,7 +110,7 @@ struct NautilusWindowSlotDetails {
          * finish. Used for showing a spinner to provide feedback to the user. */
 	gboolean allow_stop;
 	gboolean needs_reload;
-	gboolean load_with_search;
+        gchar *pending_search_text;
 
 	/* New location. */
 	GFile *pending_location;
@@ -268,6 +268,9 @@ update_search_visible (NautilusWindowSlot *slot)
                         nautilus_window_slot_set_search_visible (slot, FALSE);
                 g_object_unref (query);
         }
+
+        if (slot->details->pending_search_text)
+                nautilus_window_slot_search (slot, g_strdup (slot->details->pending_search_text));
 }
 
 static void
@@ -457,6 +460,29 @@ nautilus_window_slot_get_search_visible (NautilusWindowSlot *slot)
         return searching;
 }
 
+void
+nautilus_window_slot_search (NautilusWindowSlot *slot,
+                             const gchar        *text)
+{
+        NautilusView *view;
+
+        if (slot->details->pending_search_text) {
+                g_free (slot->details->pending_search_text);
+                slot->details->pending_search_text = NULL;
+        }
+
+        view = nautilus_window_slot_get_current_view (slot);
+        /* We could call this when the location is still being checked in the
+         * window slot. For that, save the search we want to do for once we have
+         * a view set up */
+        if (view) {
+                nautilus_window_slot_set_search_visible (slot, TRUE);
+                nautilus_query_editor_set_text (slot->details->query_editor, text);
+        } else {
+                slot->details->pending_search_text = g_strdup (text);
+        }
+}
+
 gboolean
 nautilus_window_slot_handle_event (NautilusWindowSlot *slot,
 				   GdkEventKey        *event)
@@ -605,6 +631,7 @@ nautilus_window_slot_constructed (GObject *object)
 {
 	NautilusWindowSlot *slot = NAUTILUS_WINDOW_SLOT (object);
 	GtkWidget *extras_vbox;
+        GtkStyleContext *style_context;
 
 	G_OBJECT_CLASS (nautilus_window_slot_parent_class)->constructed (object);
 
@@ -613,6 +640,8 @@ nautilus_window_slot_constructed (GObject *object)
 	gtk_widget_show (GTK_WIDGET (slot));
 
 	extras_vbox = gtk_box_new (GTK_ORIENTATION_VERTICAL, 0);
+        style_context = gtk_widget_get_style_context (extras_vbox);
+        gtk_style_context_add_class (style_context, "searchbar-container");
 	slot->details->extra_location_widgets = extras_vbox;
 	gtk_box_pack_start (GTK_BOX (slot), extras_vbox, FALSE, FALSE, 0);
 	gtk_widget_show (extras_vbox);
@@ -703,6 +732,8 @@ nautilus_window_slot_init (NautilusWindowSlot *slot)
         nautilus_application_add_accelerator (app, "slot.files-view-mode(1)", "<control>1");
         nautilus_application_add_accelerator (app, "slot.files-view-mode(0)", "<control>2");
         nautilus_application_add_accelerator (app, "slot.search-visible", "<control>f");
+
+        slot->details->view_mode_before_search = NAUTILUS_VIEW_INVALID_ID;
 }
 
 #define DEBUG_FLAG NAUTILUS_DEBUG_WINDOW
@@ -1845,6 +1876,9 @@ nautilus_window_slot_show_x_content_bar (NautilusWindowSlot *slot, GMount *mount
 	GtkWidget *bar;
 
 	g_assert (NAUTILUS_IS_WINDOW_SLOT (slot));
+
+        if (!should_handle_content_types (x_content_types))
+                return;
 
 	bar = nautilus_x_content_bar_new (mount, x_content_types);
 	gtk_widget_show (bar);

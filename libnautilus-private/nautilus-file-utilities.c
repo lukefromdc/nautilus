@@ -1,4 +1,4 @@
-/* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
+/* -*- Mode: C; indent-tabs-mode: nil; c-basic-offset: 8; tab-width: 8 -*- */
 
 /* nautilus-file-utilities.c - implementation of file manipulation routines.
 
@@ -988,6 +988,105 @@ nautilus_get_cached_x_content_types_for_mount (GMount *mount)
 	}
 
 	return NULL;
+}
+
+char *
+get_message_for_content_type (const char *content_type)
+{
+	char *message;
+	char *description;
+
+	description = g_content_type_get_description (content_type);
+
+	/* Customize greeting for well-known content types */
+	/* translators: these describe the contents of removable media */
+	if (strcmp (content_type, "x-content/audio-cdda") == 0) {
+		message = g_strdup (_("Audio CD"));
+	} else if (strcmp (content_type, "x-content/audio-dvd") == 0) {
+		message = g_strdup (_("Audio DVD"));
+	} else if (strcmp (content_type, "x-content/video-dvd") == 0) {
+		message = g_strdup (_("Video DVD"));
+	} else if (strcmp (content_type, "x-content/video-vcd") == 0) {
+		message = g_strdup (_("Video CD"));
+	} else if (strcmp (content_type, "x-content/video-svcd") == 0) {
+		message = g_strdup (_("Super Video CD"));
+	} else if (strcmp (content_type, "x-content/image-photocd") == 0) {
+		message = g_strdup (_("Photo CD"));
+	} else if (strcmp (content_type, "x-content/image-picturecd") == 0) {
+		message = g_strdup (_("Picture CD"));
+	} else if (strcmp (content_type, "x-content/image-dcf") == 0) {
+		message = g_strdup (_("Contains digital photos"));
+	} else if (strcmp (content_type, "x-content/audio-player") == 0) {
+		message = g_strdup (_("Contains music"));
+	} else if (strcmp (content_type, "x-content/unix-software") == 0) {
+		message = g_strdup (_("Contains software"));
+	} else {
+		/* fallback to generic greeting */
+		message = g_strdup_printf (_("Detected as “%s”"), description);
+	}
+
+	g_free (description);
+
+	return message;
+}
+
+char *
+get_message_for_two_content_types (char **content_types)
+{
+	char *message;
+
+	g_assert (content_types[0] != NULL);
+	g_assert (content_types[1] != NULL);
+
+	/* few combinations make sense */
+	if (strcmp (content_types[0], "x-content/image-dcf") == 0
+	    || strcmp (content_types[1], "x-content/image-dcf") == 0) {
+
+		/* translators: these describe the contents of removable media */
+		if (strcmp (content_types[0], "x-content/audio-player") == 0) {
+			message = g_strdup (_("Contains music and photos"));
+		} else if (strcmp (content_types[1], "x-content/audio-player") == 0) {
+			message = g_strdup (_("Contains photos and music"));
+		} else {
+			message = g_strdup (_("Contains digital photos"));
+		}
+	} else if ((strcmp (content_types[0], "x-content/video-vcd") == 0
+		    || strcmp (content_types[1], "x-content/video-vcd") == 0)
+		   && (strcmp (content_types[0], "x-content/video-dvd") == 0
+		       || strcmp (content_types[1], "x-content/video-dvd") == 0)) {
+		message = g_strdup_printf ("%s/%s",
+					   get_message_for_content_type (content_types[0]),
+					   get_message_for_content_type (content_types[1]));
+	} else {
+		message = get_message_for_content_type (content_types[0]);
+	}
+
+	return message;
+}
+
+gboolean
+should_handle_content_type (char *content_type)
+{
+        GAppInfo *default_app;
+
+        default_app = g_app_info_get_default_for_type (content_type, FALSE);
+
+        return !g_str_has_prefix (content_type, "x-content/blank-") &&
+               !g_content_type_is_a (content_type, "x-content/win32-software") &&
+               default_app != NULL;
+}
+
+gboolean
+should_handle_content_types (char ** content_types)
+{
+        int i;
+
+        for (i = 0; content_types[i] != NULL; i++) {
+                if (should_handle_content_type (content_types[i]))
+                        return TRUE;
+        }
+
+        return FALSE;
 }
 
 gboolean

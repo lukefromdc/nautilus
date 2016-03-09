@@ -1941,7 +1941,7 @@ nautilus_file_rename (NautilusFile *file,
 
 		if (!success) {
 			error = g_error_new (G_IO_ERROR, G_IO_ERROR_FAILED,
-					     _("Unable to rename desktop file"));
+					     _("Probably the content of the file is an invalid desktop file format"));
 			(* callback) (file, NULL, error, callback_data);
 			g_error_free (error);
 			return;
@@ -2178,7 +2178,8 @@ update_info_internal (NautilusFile *file,
 	}
 	file->details->type = file_type;
 
-	if (!file->details->got_custom_activation_uri) {
+	if (!file->details->got_custom_activation_uri &&
+	    !nautilus_file_is_in_trash (file)) {
 		activation_uri = g_file_info_get_attribute_string (info, G_FILE_ATTRIBUTE_STANDARD_TARGET_URI);
 		if (activation_uri == NULL) {
 			if (file->details->activation_uri) {
@@ -2189,7 +2190,7 @@ update_info_internal (NautilusFile *file,
 		} else {
 			old_activation_uri = file->details->activation_uri;
 			file->details->activation_uri = g_strdup (activation_uri);
-			
+
 			if (old_activation_uri) {
 				if (strcmp (old_activation_uri,
 					    file->details->activation_uri) != 0) {
@@ -4580,6 +4581,20 @@ nautilus_file_get_thumbnail_icon (NautilusFile *file,
 	return icon;
 }
 
+static gboolean
+nautilus_thumbnail_is_limited_by_zoom (int size,
+				       int scale)
+{
+	int zoom_level;
+
+	zoom_level = size * scale;
+
+	if (zoom_level <= NAUTILUS_LIST_ICON_SIZE_SMALL)
+		return TRUE;
+
+	return FALSE;
+}
+
 NautilusIconInfo *
 nautilus_file_get_icon (NautilusFile *file,
 			int size,
@@ -4607,7 +4622,8 @@ nautilus_file_get_icon (NautilusFile *file,
 	       flags & NAUTILUS_FILE_ICON_FLAGS_FORCE_THUMBNAIL_SIZE);
 
 	if (flags & NAUTILUS_FILE_ICON_FLAGS_USE_THUMBNAILS &&
-	    nautilus_file_should_show_thumbnail (file)) {
+	    nautilus_file_should_show_thumbnail (file) &&
+	    !nautilus_thumbnail_is_limited_by_zoom (size, scale)) {
 		icon = nautilus_file_get_thumbnail_icon (file, size, scale, flags);
 	}
 
@@ -4750,28 +4766,28 @@ nautilus_file_get_date_as_string (NautilusFile       *file,
 		if (days_ago < 1) {
 			if (use_24) {
 				/* Translators: Time in 24h format */
-				format = N_("%H:%M");
+				format = _("%H:%M");
 			} else {
 				/* Translators: Time in 12h format */
-				format = N_("%l:%M %p");
+				format = _("%l:%M %p");
 			}
 		}
 		// Show the word "Yesterday" and time if date is on yesterday
 		else if (days_ago < 2) {
 			if (date_format == NAUTILUS_DATE_FORMAT_REGULAR) {
 				// xgettext:no-c-format
-				format = N_("Yesterday");
+				format = _("Yesterday");
 			} else {
 				if (use_24) {
 					/* Translators: this is the word Yesterday followed by
 					 * a time in 24h format. i.e. "Yesterday 23:04" */
 					// xgettext:no-c-format
-					format = N_("Yesterday %H:%M");
+					format = _("Yesterday %H:%M");
 				} else {
 					/* Translators: this is the word Yesterday followed by
 					 * a time in 12h format. i.e. "Yesterday 9:04 PM" */
 					// xgettext:no-c-format
-					format = N_("Yesterday %l:%M %p");
+					format = _("Yesterday %l:%M %p");
 				}
 			}
 		}
@@ -4779,18 +4795,18 @@ nautilus_file_get_date_as_string (NautilusFile       *file,
 		else if (days_ago < 7) {
 			if (date_format == NAUTILUS_DATE_FORMAT_REGULAR) {
 				// xgettext:no-c-format
-				format = N_("%a");
+				format = _("%a");
 			} else {
 				if (use_24) {
 					/* Translators: this is the name of the week day followed by
 					 * a time in 24h format. i.e. "Monday 23:04" */
 					// xgettext:no-c-format
-					format = N_("%a %H:%M");
+					format = _("%a %H:%M");
 				} else {
 					/* Translators: this is the week day name followed by
 					 * a time in 12h format. i.e. "Monday 9:04 PM" */
 					// xgettext:no-c-format
-					format = N_("%a %l:%M %p");
+					format = _("%a %l:%M %p");
 				}
 			}
 		} else if (g_date_time_get_year (file_date) == g_date_time_get_year (now)) {
@@ -4798,20 +4814,20 @@ nautilus_file_get_date_as_string (NautilusFile       *file,
 				/* Translators: this is the day of the month followed
 				 * by the abbreviated month name i.e. "3 Feb" */
 				// xgettext:no-c-format
-				format = N_("%-e %b");
+				format = _("%-e %b");
 			} else {
 				if (use_24) {
 					/* Translators: this is the day of the month followed
 					 * by the abbreviated month name followed by a time in
 					 * 24h format i.e. "3 Feb 23:04" */
 					// xgettext:no-c-format
-					format = N_("%-e %b %H:%M");
+					format = _("%-e %b %H:%M");
 				} else {
 					/* Translators: this is the day of the month followed
 					 * by the abbreviated month name followed by a time in
 					 * 12h format i.e. "3 Feb 9:04" */
 					// xgettext:no-c-format
-					format = N_("%-e %b %l:%M %p");
+					format = _("%-e %b %l:%M %p");
 				}
 			}
 		} else {
@@ -4819,20 +4835,20 @@ nautilus_file_get_date_as_string (NautilusFile       *file,
 				/* Translators: this is the day of the month followed by the abbreviated
 				 * month name followed by the year i.e. "3 Feb 2015" */
 				// xgettext:no-c-format
-				format = N_("%-e %b %Y");
+				format = _("%-e %b %Y");
 			} else {
 				if (use_24) {
 					/* Translators: this is the day number followed
 					 * by the abbreviated month name followed by the year followed
 					 * by a time in 24h format i.e. "3 Feb 2015 23:04" */
 					// xgettext:no-c-format
-					format = N_("%-e %b %Y %H:%M");
+					format = _("%-e %b %Y %H:%M");
 				} else {
 					/* Translators: this is the day number followed
 					 * by the abbreviated month name followed by the year followed
 					 * by a time in 12h format i.e. "3 Feb 2015 9:04 PM" */
 					// xgettext:no-c-format
-					format = N_("%-e %b %Y %l:%M %p");
+					format = _("%-e %b %Y %l:%M %p");
 				}
 			}
 		}
@@ -4841,7 +4857,7 @@ nautilus_file_get_date_as_string (NautilusFile       *file,
 		g_date_time_unref (today_midnight);
 	} else {
 		// xgettext:no-c-format
-		format = N_("%c");
+		format = _("%c");
 	}
 
 	result = g_date_time_format (file_date, format);

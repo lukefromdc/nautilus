@@ -78,6 +78,13 @@ void nautilus_application_open_location_full (NautilusApplication     *applicati
                                               NautilusWindow          *target_window,
                                               NautilusWindowSlot      *target_slot);
 
+NautilusApplication *nautilus_application_get_default (void);
+void nautilus_application_send_notification (NautilusApplication *self,
+                                             const gchar         *notification_id,
+                                             GNotification       *notification);
+void nautilus_application_withdraw_notification (NautilusApplication *self,
+                                                 const gchar         *notification_id);
+
 NautilusBookmarkList *
      nautilus_application_get_bookmarks  (NautilusApplication *application);
 void nautilus_application_edit_bookmarks (NautilusApplication *application,
@@ -85,4 +92,8 @@ void nautilus_application_edit_bookmarks (NautilusApplication *application,
 
 GtkWidget * nautilus_application_connect_server (NautilusApplication *application,
 						 NautilusWindow      *window);
+
+void nautilus_application_search (NautilusApplication *application,
+                                  const gchar         *uri,
+                                  const gchar         *text);
 #endif /* __NAUTILUS_APPLICATION_H__ */

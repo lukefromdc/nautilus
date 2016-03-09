@@ -155,6 +155,7 @@ typedef struct {
 	GList *original_files;
 	GList *target_files;
 	GtkWidget *parent_widget;
+	GtkWindow *parent_window;
 	char *startup_id;
 	char *pending_key;
 	GHashTable *pending_files;
@@ -4424,6 +4425,7 @@ startup_data_new (GList *original_files,
 		  GList *target_files,
 		  const char *pending_key,
 		  GtkWidget *parent_widget,
+		  GtkWindow *parent_window,
 		  const char *startup_id)
 {
 	StartupData *data;
@@ -4433,6 +4435,7 @@ startup_data_new (GList *original_files,
 	data->original_files = nautilus_file_list_copy (original_files);
 	data->target_files = nautilus_file_list_copy (target_files);
 	data->parent_widget = parent_widget;
+	data->parent_window = parent_window;
 	data->startup_id = g_strdup (startup_id);
 	data->pending_key = g_strdup (pending_key);
 	data->pending_files = g_hash_table_new (g_direct_hash,
@@ -4575,6 +4578,8 @@ create_properties_window (StartupData *startup_data)
 
 	window = NAUTILUS_PROPERTIES_WINDOW (gtk_widget_new (NAUTILUS_TYPE_PROPERTIES_WINDOW,
 							     "use-header-bar", TRUE,
+							     "type-hint", GDK_WINDOW_TYPE_HINT_DIALOG,
+							     "modal", TRUE,
 							     NULL));
 
 	window->details->original_files = nautilus_file_list_copy (startup_data->original_files);
@@ -4588,11 +4593,13 @@ create_properties_window (StartupData *startup_data)
 				       gtk_widget_get_screen (startup_data->parent_widget));
 	}
 
+	if (startup_data->parent_window) {
+		gtk_window_set_transient_for (GTK_WINDOW (window), startup_data->parent_window);
+	}
+
 	if (startup_data->startup_id) {
 		gtk_window_set_startup_id (GTK_WINDOW (window), startup_data->startup_id);
 	}
-
-	gtk_window_set_type_hint (GTK_WINDOW (window), GDK_WINDOW_TYPE_HINT_DIALOG);
 
 	/* Set initial window title */
 	update_properties_window_title (window);
@@ -4855,10 +4862,17 @@ nautilus_properties_window_present (GList       *original_files,
 
 	target_files = get_target_file_list (original_files);
 
+	if (parent_widget) {
+		parent_window = gtk_widget_get_ancestor (parent_widget, GTK_TYPE_WINDOW);
+	} else {
+		parent_window = NULL;
+	}
+
 	startup_data = startup_data_new (original_files, 
 					 target_files,
 					 pending_key,
 					 parent_widget,
+					 GTK_WINDOW (parent_window),
 					 startup_id);
 
 	nautilus_file_list_free (target_files);
@@ -4872,10 +4886,7 @@ nautilus_properties_window_present (GList       *original_files,
 	if (parent_widget) {
 		g_signal_connect (parent_widget, "destroy",
 				  G_CALLBACK (parent_widget_destroyed_callback), startup_data);
-
-		parent_window = gtk_widget_get_ancestor (parent_widget, GTK_TYPE_WINDOW);
-	} else
-		parent_window = NULL;
+	}
 
 	eel_timed_wait_start
 		(cancel_create_properties_window_callback,

@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- */
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*- */
 /*
  * Copyright (C) 2008 Red Hat, Inc.
  * Copyright (C) 2006 Paolo Borelli <pborelli@katamail.com>
@@ -29,6 +29,7 @@
 
 #include "nautilus-x-content-bar.h"
 #include <libnautilus-private/nautilus-icon-info.h>
+#include <libnautilus-private/nautilus-file-utilities.h>
 #include <libnautilus-private/nautilus-program-choosing.h>
 
 #define NAUTILUS_X_CONTENT_BAR_GET_PRIVATE(o) (G_TYPE_INSTANCE_GET_PRIVATE ((o), NAUTILUS_TYPE_X_CONTENT_BAR, NautilusXContentBarPrivate))
@@ -78,80 +79,6 @@ content_bar_response_cb (GtkInfoBar *infobar,
 	}
 }
 
-static char *
-get_message_for_x_content_type (const char *x_content_type)
-{
-	char *message;
-	char *description;
-
-	description = g_content_type_get_description (x_content_type);
-
-	/* Customize greeting for well-known x-content types */
-	/* translators: these describe the contents of removable media */
-	if (strcmp (x_content_type, "x-content/audio-cdda") == 0) {
-		message = g_strdup (_("Audio CD"));
-	} else if (strcmp (x_content_type, "x-content/audio-dvd") == 0) {
-		message = g_strdup (_("Audio DVD"));
-	} else if (strcmp (x_content_type, "x-content/video-dvd") == 0) {
-		message = g_strdup (_("Video DVD"));
-	} else if (strcmp (x_content_type, "x-content/video-vcd") == 0) {
-		message = g_strdup (_("Video CD"));
-	} else if (strcmp (x_content_type, "x-content/video-svcd") == 0) {
-		message = g_strdup (_("Super Video CD"));
-	} else if (strcmp (x_content_type, "x-content/image-photocd") == 0) {
-		message = g_strdup (_("Photo CD"));
-	} else if (strcmp (x_content_type, "x-content/image-picturecd") == 0) {
-		message = g_strdup (_("Picture CD"));
-	} else if (strcmp (x_content_type, "x-content/image-dcf") == 0) {
-		message = g_strdup (_("Contains digital photos"));
-	} else if (strcmp (x_content_type, "x-content/audio-player") == 0) {
-		message = g_strdup (_("Contains music"));
-	} else if (strcmp (x_content_type, "x-content/unix-software") == 0) {
-		message = g_strdup (_("Contains software"));
-	} else {
-		/* fallback to generic greeting */
-		message = g_strdup_printf (_("Detected as “%s”"), description);
-	}
-
-	g_free (description);
-
-	return message;
-}
-
-static char *
-get_message_for_two_x_content_types (char **x_content_types)
-{
-	char *message;
-
-	g_assert (x_content_types[0] != NULL);
-	g_assert (x_content_types[1] != NULL);
-
-	/* few combinations make sense */
-	if (strcmp (x_content_types[0], "x-content/image-dcf") == 0
-	    || strcmp (x_content_types[1], "x-content/image-dcf") == 0) {
-
-		/* translators: these describe the contents of removable media */
-		if (strcmp (x_content_types[0], "x-content/audio-player") == 0) {
-			message = g_strdup (_("Contains music and photos"));
-		} else if (strcmp (x_content_types[1], "x-content/audio-player") == 0) {
-			message = g_strdup (_("Contains photos and music"));
-		} else {
-			message = g_strdup (_("Contains digital photos"));
-		}
-	} else if ((strcmp (x_content_types[0], "x-content/video-vcd") == 0
-		    || strcmp (x_content_types[1], "x-content/video-vcd") == 0)
-		   && (strcmp (x_content_types[0], "x-content/video-dvd") == 0
-		       || strcmp (x_content_types[1], "x-content/video-dvd") == 0)) {
-		message = g_strdup_printf ("%s/%s",
-					   get_message_for_x_content_type (x_content_types[0]),
-					   get_message_for_x_content_type (x_content_types[1]));
-	} else {
-		message = get_message_for_x_content_type (x_content_types[0]);
-	}
-
-	return message;
-}
-
 static void
 nautilus_x_content_bar_set_x_content_types (NautilusXContentBar *bar, const char **x_content_types)
 {
@@ -164,20 +91,19 @@ nautilus_x_content_bar_set_x_content_types (NautilusXContentBar *bar, const char
 
 	g_strfreev (bar->priv->x_content_types);
 
+        if (!should_handle_content_types (x_content_types)) {
+                g_warning ("Content types in content types bar cannot be handled. Check before creating the content bar if they can be handled.");
+                return;
+        }
+
 	types = g_ptr_array_new ();
 	apps = g_ptr_array_new ();
 	g_ptr_array_set_free_func (apps, g_object_unref);
 	for (n = 0; x_content_types[n] != NULL; n++) {
-		if (g_str_has_prefix (x_content_types[n], "x-content/blank-"))
-			continue;
-
-		if (g_content_type_is_a (x_content_types[n], "x-content/win32-software"))
+		if (!should_handle_content_type (x_content_types[n]))
 			continue;
 
 		default_app = g_app_info_get_default_for_type (x_content_types[n], FALSE);
-		if (default_app == NULL)
-			continue;
-
 		g_ptr_array_add (types, g_strdup (x_content_types[n]));
 		g_ptr_array_add (apps, default_app);
 	}
@@ -188,24 +114,15 @@ nautilus_x_content_bar_set_x_content_types (NautilusXContentBar *bar, const char
 	bar->priv->x_content_types = (char **) g_ptr_array_free (types, FALSE);
 
 	switch (num_types) {
-	case 0:
-		message = NULL;
-		break;
 	case 1:
-		message = get_message_for_x_content_type (bar->priv->x_content_types[0]);
+		message = get_message_for_content_type (bar->priv->x_content_types[0]);
 		break;
 	case 2:
-		message = get_message_for_two_x_content_types (bar->priv->x_content_types);
+		message = get_message_for_two_content_types (bar->priv->x_content_types);
 		break;
 	default:
 		message = g_strdup (_("Open with:"));
 		break;
-	}
-
-	if (message == NULL) {
-		g_ptr_array_free (apps, TRUE);
-		gtk_widget_destroy (GTK_WIDGET (bar));
-		return;
 	}
 
 	gtk_label_set_text (GTK_LABEL (bar->priv->label), message);

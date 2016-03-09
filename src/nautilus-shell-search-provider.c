@@ -546,8 +546,9 @@ result_list_attributes_ready_cb (GList    *file_list,
                            "id", g_variant_new_string (uri));
     g_variant_builder_add (&meta, "{sv}",
                            "name", g_variant_new_string (display_name));
+    /* Some backends like trash:/// don't have a path, so we show the uri itself. */
     g_variant_builder_add (&meta, "{sv}",
-                           "description", g_variant_new_string (description));
+                           "description", g_variant_new_string (description? description : uri));
 
     gicon = NULL;
     thumbnail_path = nautilus_file_get_thumbnail_path (file);
@@ -662,8 +663,7 @@ handle_launch_search (NautilusShellSearchProvider2 *skeleton,
   gchar *string = g_strjoinv (" ", terms);
   gchar *uri = nautilus_get_home_directory_uri ();
 
-  g_action_group_activate_action (G_ACTION_GROUP (app), "search",
-                                  g_variant_new ("(ss)", uri, string));
+  nautilus_application_search (app, uri, string);
 
   g_free (string);
   g_free (uri);

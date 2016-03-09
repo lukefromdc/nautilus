@@ -1,4 +1,4 @@
-/* -*- Mode: C; indent-tabs-mode: t; c-basic-offset: 8; tab-width: 8 -*- */
+/* -*- Mode: C; indent-tabs-mode: nil; c-basic-offset: 8; tab-width: 8 -*- */
 /*
  * nautilus-application: main Nautilus application class.
  *
@@ -80,6 +80,8 @@ struct _NautilusApplicationPriv {
 	NautilusShellSearchProvider *search_provider;
 
 	GList *windows;
+
+        GHashTable *notifications;
 };
 
 void
@@ -422,7 +424,7 @@ nautilus_application_open_location_full (NautilusApplication     *application,
         nautilus_window_open_location_full (target_window, location, flags, selection, target_slot);
 }
 
-static void
+static NautilusWindow*
 open_window (NautilusApplication *application,
              GFile               *location)
 {
@@ -442,6 +444,8 @@ open_window (NautilusApplication *application,
 	}
 
 	nautilus_profile_end (NULL);
+
+        return window;
 }
 
 void
@@ -529,6 +533,8 @@ nautilus_application_finalize (GObject *object)
 	g_clear_object (&application->priv->search_provider);
 
 	g_list_free (application->priv->windows);
+
+        g_hash_table_destroy (application->priv->notifications);
 
         G_OBJECT_CLASS (nautilus_application_parent_class)->finalize (object);
 }
@@ -989,6 +995,11 @@ nautilus_application_init (NautilusApplication *application)
 		G_TYPE_INSTANCE_GET_PRIVATE (application, NAUTILUS_TYPE_APPLICATION,
 					     NautilusApplicationPriv);
 
+        application->priv->notifications = g_hash_table_new_full (g_str_hash,
+                                                                  g_str_equal,
+                                                                  g_free,
+                                                                  NULL);
+
 	g_application_add_main_option_entries (G_APPLICATION (application), options);
 }
 
@@ -1104,6 +1115,56 @@ setup_theme_extensions (void)
 	theme_changed (settings);
 }
 
+NautilusApplication *
+nautilus_application_get_default (void)
+{
+        NautilusApplication *self;
+
+        self = NAUTILUS_APPLICATION (g_application_get_default ());
+
+        return self;
+}
+
+void
+nautilus_application_send_notification (NautilusApplication *self,
+                                        const gchar         *notification_id,
+                                        GNotification       *notification)
+{
+        g_hash_table_add (self->priv->notifications, g_strdup (notification_id));
+        g_application_send_notification (G_APPLICATION (self), notification_id, notification);
+}
+
+void
+nautilus_application_withdraw_notification (NautilusApplication *self,
+                                            const gchar         *notification_id)
+{
+        if (!g_hash_table_contains (self->priv->notifications, notification_id)) {
+                return;
+        }
+
+        g_hash_table_remove (self->priv->notifications, notification_id);
+        g_application_withdraw_notification (G_APPLICATION (self), notification_id);
+}
+
+static void
+on_application_shutdown (GApplication *application,
+                         gpointer      user_data)
+{
+        NautilusApplication *self = NAUTILUS_APPLICATION (application);
+        GList *notification_ids;
+        GList *l;
+        gchar *notification_id;
+
+        notification_ids = g_hash_table_get_keys (self->priv->notifications);
+        for (l = notification_ids; l != NULL; l = l->next) {
+                notification_id = l->data;
+
+                g_application_withdraw_notification (application, notification_id);
+        }
+
+        g_list_free (notification_ids);
+}
+
 static void
 nautilus_application_startup (GApplication *app)
 {
@@ -1151,6 +1212,8 @@ nautilus_application_startup (GApplication *app)
 	init_desktop (self);
 
 	nautilus_profile_end (NULL);
+
+        g_signal_connect (self, "shutdown", G_CALLBACK (on_application_shutdown), NULL);
 }
 
 static gboolean
@@ -1369,4 +1432,19 @@ nautilus_application_new (void)
 			     "inactivity-timeout", 12000,
 			     "register-session", TRUE,
 			     NULL);
+}
+
+void
+nautilus_application_search (NautilusApplication *application,
+                             const gchar         *uri,
+                             const gchar         *text)
+{
+        NautilusWindow *window;
+        GFile *location;
+
+        location = g_file_new_for_uri (uri);
+        window = open_window (application, location);
+        nautilus_window_search (window, text);
+
+        g_object_unref (location);
 }

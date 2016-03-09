@@ -727,26 +727,6 @@ showing_trash_directory (NautilusFilesView *view)
 }
 
 static gboolean
-showing_remote_directory (NautilusFilesView *view)
-{
-        NautilusDirectory *base;
-
-        /* Nautilus search is kind of special, since when we swtich to a search directory
-         * its uri is something invented, not a real GFile or where we were before
-         * entering search. For that we need to get the base model of the search directory,
-         * that is basically the real location we were before entering search */
-        if (NAUTILUS_IS_SEARCH_DIRECTORY (view->details->model))
-                base = nautilus_search_directory_get_base_model (NAUTILUS_SEARCH_DIRECTORY (view->details->model));
-        else
-                base = view->details->model;
-
-        if (base != NULL)
-                return nautilus_directory_is_remote (base);
-        else
-                return FALSE;
-}
-
-static gboolean
 showing_recent_directory (NautilusFilesView *view)
 {
         NautilusFile *file;
@@ -773,7 +753,7 @@ nautilus_files_view_is_empty (NautilusFilesView *view)
 {
         g_return_val_if_fail (NAUTILUS_IS_FILES_VIEW (view), FALSE);
 
-        return         NAUTILUS_FILES_VIEW_CLASS (G_OBJECT_GET_CLASS (view))->is_empty (view);
+        return NAUTILUS_FILES_VIEW_CLASS (G_OBJECT_GET_CLASS (view))->is_empty (view);
 }
 
 /**
@@ -1655,6 +1635,7 @@ reveal_newly_added_folder (NautilusFilesView *view,
                                                       G_CALLBACK (reveal_newly_added_folder),
                                                       (void *) target_location);
                 nautilus_files_view_select_file (view, new_file);
+                nautilus_files_view_reveal_selection (view);
         }
         g_object_unref (location);
 }
@@ -1744,6 +1725,7 @@ new_folder_done (GFile    *new_folder,
                 if (g_hash_table_lookup_extended (data->added_locations, new_folder, NULL, NULL)) {
                         /* The file was already added */
                         nautilus_files_view_select_file (directory_view, file);
+                        nautilus_files_view_reveal_selection (directory_view);
                 } else {
                         /* We need to run after the default handler adds the folder we want to
                          * operate on. The ADD_FILE signal is registered as G_SIGNAL_RUN_LAST, so we
@@ -3183,6 +3165,7 @@ static void
 done_loading (NautilusFilesView *view,
               gboolean           all_files_seen)
 {
+        GList *pending_selection;
         GList *selection;
         gboolean do_reveal = FALSE;
 
@@ -3199,18 +3182,25 @@ done_loading (NautilusFilesView *view,
                 schedule_update_status (view);
                 reset_update_interval (view);
 
-                selection = view->details->pending_selection;
+                pending_selection = view->details->pending_selection;
+                selection = nautilus_view_get_selection (NAUTILUS_VIEW (view));
 
-                if (nautilus_view_is_searching (NAUTILUS_VIEW (view)) && all_files_seen) {
+                if (nautilus_view_is_searching (NAUTILUS_VIEW (view)) &&
+                    all_files_seen && !selection) {
                         nautilus_files_view_select_first (view);
                         do_reveal = TRUE;
-                } else if (selection != NULL && all_files_seen) {
+                } else if (pending_selection != NULL && all_files_seen) {
                         view->details->pending_selection = NULL;
 
                         nautilus_files_view_call_set_selection (view, selection);
-                        g_list_free_full (selection, g_object_unref);
                         do_reveal = TRUE;
                 }
+
+                if (selection)
+                        g_list_free_full (selection, g_object_unref);
+
+                if (pending_selection)
+                        g_list_free_full (pending_selection, g_object_unref);
 
                 if (do_reveal) {
                         if (NAUTILUS_IS_LIST_VIEW (view)) {
@@ -3577,7 +3567,7 @@ process_new_files (NautilusFilesView *view)
                                         new_changed_files = g_list_delete_link (new_changed_files, node);
                                         old_added_files = g_list_prepend (old_added_files, pending);
                                 }
-                        } else if (nautilus_files_view_should_show_file (view, pending->file)) {
+                        } else {
                                 new_changed_files = g_list_delete_link (new_changed_files, node);
                                 old_changed_files = g_list_prepend (old_changed_files, pending);
                         }
@@ -3663,6 +3653,9 @@ display_pending_files (NautilusFilesView *view)
 {
         process_new_files (view);
         process_old_files (view);
+
+        if (!nautilus_files_view_get_selection (NAUTILUS_VIEW (view)))
+                nautilus_files_view_select_first (view);
 
         if (view->details->model != NULL
             && nautilus_directory_are_all_files_seen (view->details->model)
@@ -6397,9 +6390,7 @@ real_update_actions_state (NautilusFilesView *view)
         action = g_action_map_lookup_action (G_ACTION_MAP (view_action_group),
                                              "open-with-other-application");
         g_simple_action_set_enabled (G_SIMPLE_ACTION (action),
-                                     app != NULL ||
-                                     (selection_count > 0 &&
-                                      nautilus_file_is_directory (NAUTILUS_FILE (selection->data))));
+                                     selection_count > 0);
 
         action = g_action_map_lookup_action (G_ACTION_MAP (view_action_group),
                                              "open-item-new-tab");
@@ -8095,6 +8086,11 @@ nautilus_files_view_init (NautilusFilesView *view)
                 "<alt>Down",
                 NULL
         };
+	const gchar *open_properties[] = {
+		"<control>i",
+		"<alt>Return",
+		NULL
+	};
 
         nautilus_profile_start (NULL);
 
@@ -8269,7 +8265,7 @@ nautilus_files_view_init (NautilusFilesView *view)
          * actions active */
         nautilus_application_add_accelerator (app, "view.delete-permanently-menu-item", "Delete");
         nautilus_application_add_accelerator (app, "view.permanent-delete-permanently-menu-item", "<shift>Delete");
-        nautilus_application_add_accelerator (app, "view.properties", "<control>i");
+	gtk_application_set_accels_for_action (GTK_APPLICATION (app), "view.properties", open_properties);
         nautilus_application_add_accelerator (app, "view.open-item-location", "<control><alt>o");
         nautilus_application_add_accelerator (app, "view.rename", "F2");
         nautilus_application_add_accelerator (app, "view.cut", "<control>x");

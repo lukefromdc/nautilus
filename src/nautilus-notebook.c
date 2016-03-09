@@ -1,4 +1,4 @@
-/* -*- Mode: C; tab-width: 8; indent-tabs-mode: t; c-basic-offset: 8 -*- */
+/* -*- Mode: C; tab-width: 8; indent-tabs-mode: nil; c-basic-offset: 8 -*- */
 /*
  *  Copyright © 2002 Christophe Fergeau
  *  Copyright © 2003, 2004 Marco Pesenti Gritti
@@ -188,6 +188,24 @@ nautilus_notebook_init (NautilusNotebook *notebook)
 #endif
 }
 
+gboolean
+nautilus_notebook_contains_slot (NautilusNotebook   *notebook,
+                                 NautilusWindowSlot *slot)
+{
+        GList *children;
+        GList *l;
+        gboolean found = FALSE;
+
+        children = gtk_container_get_children (GTK_CONTAINER (notebook));
+        for (l = children; l != NULL && !found; l = l->next) {
+                found = l->data == slot;
+        }
+
+        g_list_free (children);
+
+        return found;
+}
+
 void
 nautilus_notebook_sync_loading (NautilusNotebook *notebook,
 				NautilusWindowSlot *slot)
@@ -314,7 +332,7 @@ build_tab_label (NautilusNotebook *nb, NautilusWindowSlot *slot)
 	gtk_button_set_relief (GTK_BUTTON (close_button),
 			       GTK_RELIEF_NONE);
 	/* don't allow focus on the close button */
-	gtk_button_set_focus_on_click (GTK_BUTTON (close_button), FALSE);
+	gtk_widget_set_focus_on_click (close_button, FALSE);
 
 	gtk_widget_set_name (close_button, "nautilus-tab-close-button");
 
