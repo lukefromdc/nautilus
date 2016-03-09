@@ -174,8 +174,7 @@ nautilus_desktop_window_constructed (GObject *obj)
 	/* shouldn't really be needed given our semantic type
 	 * of _NET_WM_TYPE_DESKTOP, but why not
 	 */
-	gtk_window_set_resizable (GTK_WINDOW (window),
-				  FALSE);
+
 	gtk_window_set_decorated (GTK_WINDOW (window),
 				  FALSE);
 
